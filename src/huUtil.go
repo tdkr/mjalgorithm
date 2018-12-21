@@ -8,16 +8,16 @@ import (
 	"fmt"
 )
 
-func CalcKey(matrix [][]int, pos []int) (key int64) {
+func CalcKey(cards []int, pos []int) (key int64) {
 	isContinue := false /*是否连续*/
 	index := 0
 	for row := 0; row < 4; row++ {
 		for col := 0; col < 9; col++ {
-			num := matrix[row][col]
+			num := cards[row*9+col]
 			if num == 0 {
 				continue
 			}
-			isContinue = row < 3 && col > 0 && matrix[row][col-1] > 0
+			isContinue = row < 3 && col > 0 && cards[row*9+col-1] > 0
 			switch num {
 			case 1: // 1:0, 10
 				if isContinue {
@@ -64,4 +64,103 @@ func CalcGroups(huTable map[int64][][]int, key int64, pos []int) (result [][]int
 		fmt.Printf("AnalyseHuInfo, key %b not found\n", key)
 	}
 	return
+}
+
+func CheckHu(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) [][]int {
+	lzNum := 0
+	dupCards := make([]int, len(cards))
+	copy(dupCards, cards)
+	for k, _ := range lzFlag {
+		lzNum += cards[k]
+		dupCards[k] = 0
+	}
+	if lzNum == 0 {
+		pos := make([]int, 14)
+		key := CalcKey(cards, pos)
+		result := CalcGroups(huTable, key, pos)
+		return result
+	} else {
+		for i := 0; i < 34; i++ {
+			if cards[i] > 0 {
+				if cards[i] < 2 {
+					cards[i] = 0
+				} else {
+					cards[i] -= 2
+				}
+				checkHuWithEye(huTable, cards, lzNum, i)
+			}
+		}
+	}
+	return nil
+}
+
+func scanKeFromPos(cards []int, lzNum int, pos int) (bool, int) {
+	if cards[pos] == 0 {
+		return false, lzNum
+	}
+	if cards[pos]+lzNum < 3 {
+		return false, lzNum
+	}
+	if cards[pos] < 3 {
+		lzNum -= 3 - cards[pos]
+		cards[pos] = 0
+	} else {
+		cards[pos] -= 3
+	}
+	return true, lzNum
+}
+
+func scanShunFromPos(cards []int, lzNum int, pos int) (bool, int) {
+	if pos < 0 || pos > 6 {
+		return false, lzNum
+	}
+	if cards[pos] > 0 && cards[pos+1] == 0 && cards[pos+2] == 0 {
+		return false, lzNum
+	}
+	if cards[pos]+cards[pos+1]+cards[pos+2]+lzNum < 3 {
+		return false, lzNum
+	}
+	for i := pos; i <= pos+2; i++ {
+		if cards[i] == 0 {
+			lzNum--
+		} else {
+			cards[i]--
+		}
+	}
+	return true, lzNum
+}
+
+func checkHuWithEye(huTable map[int64][][]int, cards []int, lzNum int, eye int) {
+	if lzNum == 0 {
+
+	}
+
+	dupCards := make([]int, len(cards))
+	copy(dupCards, cards)
+	leftLz := lzNum
+	for i := 0; i < 34; i++ {
+		ret, leftLz := scanKeFromPos(dupCards, leftLz, i)
+		ret, leftLz = scanShunFromPos(dupCards, leftLz, i)
+		if !ret {
+			break
+		}
+		if lzNum == 0 {
+			dupCards[eye] = 2
+			maps = make(map[int]bool)
+			ret := CheckHu(huTable, dupCards, maps)
+		}
+	}
+
+	copy(dupCards, cards)
+	leftLz = lzNum
+	for i := 0; i < 34; i++ {
+		ret, leftLz := scanShunFromPos(dupCards, leftLz, i)
+		ret, leftLz = scanKeFromPos(dupCards, leftLz, i)
+		if !ret {
+			break
+		}
+		if lzNum == 0 {
+
+		}
+	}
 }
