@@ -6,6 +6,8 @@ package hu
 
 import (
 	"fmt"
+
+	"github.com/eapache/queue"
 )
 
 func CalcKey(cards []int, pos []int) (key int64) {
@@ -32,7 +34,7 @@ func CalcKey(cards []int, pos []int) (key int64) {
 				}
 				key = (key << bn) + (1 << bn) - 2
 			}
-			pos[index] = row*10 + col + 1
+			pos[index] = row*9 + col
 			index++
 			//fmt.Println("calcKey", row, col, num, strconv.FormatInt(key, 2), isContinue)
 		}
@@ -61,12 +63,19 @@ func CalcGroups(huTable map[int64][][]int, key int64, pos []int) (result [][]int
 			//fmt.Printf("AnalyseHuInfo, key : %d, %v\n", result[i])
 		}
 	} else {
-		fmt.Printf("AnalyseHuInfo, key %b not found\n", key)
+		//fmt.Printf("AnalyseHuInfo, key %b not found\n", key)
 	}
 	return
 }
 
-func CheckHu(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) [][]int {
+func CheckHu(huTable map[int64][][]int, cards []int) [][]int {
+	pos := make([]int, 14)
+	key := CalcKey(cards, pos)
+	result := CalcGroups(huTable, key, pos)
+	return result
+}
+
+func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) [][]int {
 	lzNum := 0
 	dupCards := make([]int, len(cards))
 	copy(dupCards, cards)
@@ -74,40 +83,181 @@ func CheckHu(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) [][]in
 		lzNum += cards[k]
 		dupCards[k] = 0
 	}
-	if lzNum == 0 {
-		pos := make([]int, 14)
-		key := CalcKey(cards, pos)
-		result := CalcGroups(huTable, key, pos)
-		return result
-	} else {
-		for i := 0; i < 34; i++ {
-			if cards[i] > 0 {
-				if cards[i] < 2 {
-					cards[i] = 0
-				} else {
-					cards[i] -= 2
-				}
-				checkHuWithEye(huTable, cards, lzNum, i)
-			}
+	eyeArr := make([]int, 0)
+	for val, num := range dupCards {
+		if num > 0 {
+			eyeArr = append(eyeArr, val)
 		}
 	}
-	return nil
+	if lzNum >= 2 {
+		for k := range lzFlag {
+			eyeArr = append(eyeArr, k)
+		}
+	}
+	results := make([][]int, 0)
+	for _, eye := range eyeArr {
+		backNum := lzNum
+		repCards, ok := checkEyeWithLz(dupCards, eye, lzNum)
+		if !ok {
+			continue
+		}
+		lzNum -= len(repCards)
+		ret := queue.New()
+		rep := make([]int, 0, lzNum)
+		iterateCards(ret, dupCards, lzNum, 0, rep)
+		for i := 0; i < ret.Length(); i++ {
+			tmpCards := make([]int, len(dupCards))
+			tmpCards[eye] += 2
+			copy(tmpCards, dupCards)
+			item := ret.Get(i).([]int)
+			for _, v := range item {
+				tmpCards[v]++
+			}
+			fmt.Println("CheckHuWithLZ", dupCards, tmpCards)
+			t := CheckHu(huTable, tmpCards)
+			if t != nil {
+				results = append(results, t...)
+			}
+		}
+		lzNum = backNum
+		dupCards[eye] += 2
+		for _, v := range repCards {
+			dupCards[v]++
+		}
+	}
+	return results
 }
 
-func scanKeFromPos(cards []int, lzNum int, pos int) (bool, int) {
+func iterateCards(results *queue.Queue, cards []int, lzNum int, pos int, repCards []int) {
+	if pos >= len(cards) {
+		return
+	}
+	fmt.Println("iterateCards", pos, cards[pos], cards, repCards, lzNum)
+	if lzNum == 0 {
+		results.Add(repCards)
+		return
+	}
 	if cards[pos] == 0 {
-		return false, lzNum
+		iterateCards(results, cards, lzNum, pos+1, repCards)
+		return
 	}
+	for i := 0; i < 2; i++ {
+		n0 := len(repCards)
+		blzNum := lzNum
+		keNum, shunNum := 0, 0
+		if i == 0 {
+			if arr, ok := checkKeWithLz(cards, pos, lzNum); ok {
+				repCards = append(repCards, arr...)
+				lzNum -= len(arr)
+				keNum++
+			}
+			for cards[pos] > 0 {
+				if arr, ok := checkShunWithLz(cards, pos, lzNum); ok {
+					repCards = append(repCards, arr...)
+					lzNum -= len(arr)
+					shunNum++
+				} else {
+					break
+				}
+			}
+		} else {
+			for cards[pos] > 0 {
+				if arr, ok := checkShunWithLz(cards, pos, lzNum); ok {
+					repCards = append(repCards, arr...)
+					lzNum -= len(arr)
+					shunNum++
+				} else {
+					break
+				}
+			}
+			if arr, ok := checkKeWithLz(cards, pos, lzNum); ok {
+				repCards = append(repCards, arr...)
+				lzNum -= len(arr)
+				keNum++
+			}
+		}
+		if shunNum+keNum > 0 {
+			n1 := len(repCards)
+			iterateCards(results, cards, lzNum, pos+1, repCards)
+			lzNum = blzNum
+			n2 := len(repCards)
+			for i := 0; i < n2-n1; i++ {
+				repCards = repCards[:len(repCards)-1]
+			}
+			for i := 0; i < keNum; i++ {
+				cards[pos] += 3
+			}
+			for i := 0; i < shunNum; i++ {
+				cards[pos]++
+				cards[pos+1]++
+				cards[pos+2]++
+			}
+			fmt.Println("restore1", repCards, n0, n1, n2, cards)
+			for i := 0; i < n1-n0; i++ {
+				tail := len(repCards) - 1
+				cards[repCards[tail]]--
+				repCards = repCards[:tail]
+			}
+			fmt.Println("restore2", repCards, cards)
+		}
+	}
+}
+
+func checkEyeWithLz(cards []int, pos int, lzNum int) ([]int, bool) {
+	if cards[pos]+lzNum < 2 {
+		return nil, false
+	}
+	ret := make([]int, 0)
+	if cards[pos] >= 2 {
+		cards[pos] -= 2
+	} else {
+		for i := 0; i < 2-cards[pos]; i++ {
+			ret = append(ret, pos)
+		}
+		cards[pos] = 0
+	}
+	return ret, true
+}
+
+func checkKeWithLz(cards []int, pos int, lzNum int) ([]int, bool) {
 	if cards[pos]+lzNum < 3 {
-		return false, lzNum
+		return nil, false
 	}
-	if cards[pos] < 3 {
+	repCards := make([]int, 0)
+	if cards[pos] >= 3 {
+		cards[pos] -= 3
+	} else {
+		for i := 0; i < 3-cards[pos]; i++ {
+			repCards = append(repCards, pos)
+		}
 		lzNum -= 3 - cards[pos]
 		cards[pos] = 0
-	} else {
-		cards[pos] -= 3
 	}
-	return true, lzNum
+	return repCards, true
+}
+
+func checkShunWithLz(cards []int, pos int, lzNum int) ([]int, bool) {
+	if pos/9 == 3 || pos%9 > 6 {
+		return nil, false
+	}
+	need := 0
+	for i := pos; i <= pos+2; i++ {
+		if cards[i] == 0 {
+			need++
+		}
+	}
+	if need > lzNum {
+		return nil, false
+	}
+	repCards := make([]int, 0)
+	for i := pos; i <= pos+2; i++ {
+		if cards[i] == 0 {
+			repCards = append(repCards, pos)
+		} else {
+			cards[i]--
+		}
+	}
+	return repCards, true
 }
 
 func scanShunFromPos(cards []int, lzNum int, pos int) (bool, int) {
@@ -128,38 +278,4 @@ func scanShunFromPos(cards []int, lzNum int, pos int) (bool, int) {
 		}
 	}
 	return true, lzNum
-}
-
-func iterateLaizi(cards []int, pos int) {
-
-}
-
-func checkHuWithEye(huTable map[int64][][]int, cards []int, lzNum int) {
-	lzFlag := make(map[int]bool)
-	lzList := make([]int, 0)
-	for i:=0; i<=3;i++ {
-		for j:=0; j<9; j++ {
-			val := i*9 + j
-			p1 := i*9
-			p2 := p1 + 9
-			if cards[val] > 0 {
-				if i == 3 {
-					lzFlag[val] = true
-				} else {
-					for k:=val-lzNum; k<=val+lzNum; k++ {
-						if lzFlag[k] == false && k >= p1 && k <= p2 {
-							lzFlag[k] = true
-						}
-					}
-				}
-			}
-		}
-	}
-	
-	leftNum := lzNum
-	for i,v := range(lzList) {
-		for j:=0; j < leftNum; j++ {
-			cards[v] = j
-		}
-	}
 }

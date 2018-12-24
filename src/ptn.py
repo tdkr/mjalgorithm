@@ -175,7 +175,7 @@ def record(*args):
         f.close()
     print("write finished, total", len(keyMap), max)
 
-# record(combs14, combs11, combs8, combs5, combs2)
+record(combs14, combs11, combs8, combs5, combs2)
 
 # arr = find_comb([[4,4,4,2]])
 # print(arr)
