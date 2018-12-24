@@ -130,37 +130,36 @@ func scanShunFromPos(cards []int, lzNum int, pos int) (bool, int) {
 	return true, lzNum
 }
 
-func checkHuWithEye(huTable map[int64][][]int, cards []int, lzNum int, eye int) {
-	if lzNum == 0 {
+func iterateLaizi(cards []int, pos int) {
 
+}
+
+func checkHuWithEye(huTable map[int64][][]int, cards []int, lzNum int) {
+	lzFlag := make(map[int]bool)
+	lzList := make([]int, 0)
+	for i:=0; i<=3;i++ {
+		for j:=0; j<9; j++ {
+			val := i*9 + j
+			p1 := i*9
+			p2 := p1 + 9
+			if cards[val] > 0 {
+				if i == 3 {
+					lzFlag[val] = true
+				} else {
+					for k:=val-lzNum; k<=val+lzNum; k++ {
+						if lzFlag[k] == false && k >= p1 && k <= p2 {
+							lzFlag[k] = true
+						}
+					}
+				}
+			}
+		}
 	}
-
-	dupCards := make([]int, len(cards))
-	copy(dupCards, cards)
-	leftLz := lzNum
-	for i := 0; i < 34; i++ {
-		ret, leftLz := scanKeFromPos(dupCards, leftLz, i)
-		ret, leftLz = scanShunFromPos(dupCards, leftLz, i)
-		if !ret {
-			break
-		}
-		if lzNum == 0 {
-			dupCards[eye] = 2
-			maps = make(map[int]bool)
-			ret := CheckHu(huTable, dupCards, maps)
-		}
-	}
-
-	copy(dupCards, cards)
-	leftLz = lzNum
-	for i := 0; i < 34; i++ {
-		ret, leftLz := scanShunFromPos(dupCards, leftLz, i)
-		ret, leftLz = scanKeFromPos(dupCards, leftLz, i)
-		if !ret {
-			break
-		}
-		if lzNum == 0 {
-
+	
+	leftNum := lzNum
+	for i,v := range(lzList) {
+		for j:=0; j < leftNum; j++ {
+			cards[v] = j
 		}
 	}
 }
