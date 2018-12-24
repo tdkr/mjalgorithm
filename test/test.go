@@ -68,7 +68,7 @@ func main() {
 	lzFlag[4] = true
 	lzFlag[5] = true
 	var ret [][]int
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 100000; i++ {
 		ret = hu.CheckHuWithLZ(huTable, matrix, lzFlag)
 	}
 	fmt.Println("testFinished", time.Since(start))

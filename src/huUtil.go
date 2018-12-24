@@ -113,6 +113,7 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) 
 			tmpCards[eye] += 2
 			t := CheckHu(huTable, tmpCards)
 			if t != nil {
+				// fmt.Println("CheckHuWithLZ", eye, tmpCards, t)
 				results = append(results, t...)
 			}
 		}
@@ -131,71 +132,63 @@ func iterateCards(results *queue.Queue, cards []int, lzNum int, pos int, repCard
 	}
 	// fmt.Println("iterateCards", pos, cards[pos], cards, repCards, lzNum)
 	if lzNum == 0 {
-		results.Add(repCards)
+		t := make([]int, len(repCards))
+		copy(t, repCards)
+		results.Add(t)
 		return
 	}
 	if cards[pos] == 0 {
 		iterateCards(results, cards, lzNum, pos+1, repCards)
 		return
 	}
-	for i := 0; i < 2; i++ {
-		n0 := len(repCards)
-		blzNum := lzNum
-		keNum, shunNum := 0, 0
-		if i == 0 {
-			if arr, ok := checkKeWithLz(cards, pos, lzNum); ok {
-				repCards = append(repCards, arr...)
-				lzNum -= len(arr)
-				keNum++
-			}
-			for cards[pos] > 0 {
-				if arr, ok := checkShunWithLz(cards, pos, lzNum); ok {
-					repCards = append(repCards, arr...)
-					lzNum -= len(arr)
-					shunNum++
-				} else {
-					break
-				}
-			}
-		} else {
-			for cards[pos] > 0 {
-				if arr, ok := checkShunWithLz(cards, pos, lzNum); ok {
-					repCards = append(repCards, arr...)
-					lzNum -= len(arr)
-					shunNum++
-				} else {
-					break
-				}
-			}
-			if arr, ok := checkKeWithLz(cards, pos, lzNum); ok {
-				repCards = append(repCards, arr...)
-				lzNum -= len(arr)
-				keNum++
-			}
+
+	n0 := len(repCards)
+	dupLz := lzNum
+
+	if arr, ok := checkKeWithLz(cards, pos, lzNum); ok {
+		repCards = append(repCards, arr...)
+		lzNum -= len(arr)
+		n1 := len(repCards)
+		iterateCards(results, cards, lzNum, pos, repCards)
+		n2 := len(repCards)
+		lzNum = dupLz
+		for i := 0; i < n2-n1; i++ {
+			repCards = repCards[:len(repCards)-1]
 		}
-		if shunNum+keNum > 0 {
-			n1 := len(repCards)
-			iterateCards(results, cards, lzNum, pos+1, repCards)
-			lzNum = blzNum
-			n2 := len(repCards)
-			for i := 0; i < n2-n1; i++ {
-				repCards = repCards[:len(repCards)-1]
-			}
-			for i := 0; i < keNum; i++ {
-				cards[pos] += 3
-			}
-			for i := 0; i < shunNum; i++ {
-				cards[pos]++
-				cards[pos+1]++
-				cards[pos+2]++
-			}
-			// fmt.Println("restore1", repCards, n0, n1, n2, cards)
-			for i := 0; i < n1-n0; i++ {
-				tail := len(repCards) - 1
-				cards[repCards[tail]]--
-				repCards = repCards[:tail]
-			}
-			// fmt.Println("restore2", repCards, cards)
+		cards[pos] += 3
+		for i := 0; i < n1-n0; i++ {
+			tail := len(repCards) - 1
+			cards[repCards[tail]]--
+			repCards = repCards[:tail]
+		}
+	}
+
+	shunNum := 0
+	for cards[pos] > 0 {
+		if arr, ok := checkShunWithLz(cards, pos, lzNum); ok {
+			repCards = append(repCards, arr...)
+			lzNum -= len(arr)
+			shunNum++
+		} else {
+			break
+		}
+	}
+	if shunNum > 0 {
+		n1 := len(repCards)
+		iterateCards(results, cards, lzNum, pos+1, repCards)
+		n2 := len(repCards)
+		for i := 0; i < n2-n1; i++ {
+			repCards = repCards[:len(repCards)-1]
+		}
+		for i := 0; i < shunNum; i++ {
+			cards[pos]++
+			cards[pos+1]++
+			cards[pos+2]++
+		}
+		for i := 0; i < n1-n0; i++ {
+			tail := len(repCards) - 1
+			cards[repCards[tail]]--
+			repCards = repCards[:tail]
 		}
 	}
 }
