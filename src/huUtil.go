@@ -5,8 +5,6 @@
 package hu
 
 import (
-	"fmt"
-
 	"github.com/eapache/queue"
 )
 
@@ -107,13 +105,12 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) 
 		iterateCards(ret, dupCards, lzNum, 0, rep)
 		for i := 0; i < ret.Length(); i++ {
 			tmpCards := make([]int, len(dupCards))
-			tmpCards[eye] += 2
 			copy(tmpCards, dupCards)
 			item := ret.Get(i).([]int)
 			for _, v := range item {
 				tmpCards[v]++
 			}
-			fmt.Println("CheckHuWithLZ", dupCards, tmpCards)
+			tmpCards[eye] += 2
 			t := CheckHu(huTable, tmpCards)
 			if t != nil {
 				results = append(results, t...)
@@ -132,7 +129,7 @@ func iterateCards(results *queue.Queue, cards []int, lzNum int, pos int, repCard
 	if pos >= len(cards) {
 		return
 	}
-	fmt.Println("iterateCards", pos, cards[pos], cards, repCards, lzNum)
+	// fmt.Println("iterateCards", pos, cards[pos], cards, repCards, lzNum)
 	if lzNum == 0 {
 		results.Add(repCards)
 		return
@@ -192,13 +189,13 @@ func iterateCards(results *queue.Queue, cards []int, lzNum int, pos int, repCard
 				cards[pos+1]++
 				cards[pos+2]++
 			}
-			fmt.Println("restore1", repCards, n0, n1, n2, cards)
+			// fmt.Println("restore1", repCards, n0, n1, n2, cards)
 			for i := 0; i < n1-n0; i++ {
 				tail := len(repCards) - 1
 				cards[repCards[tail]]--
 				repCards = repCards[:tail]
 			}
-			fmt.Println("restore2", repCards, cards)
+			// fmt.Println("restore2", repCards, cards)
 		}
 	}
 }
@@ -252,7 +249,7 @@ func checkShunWithLz(cards []int, pos int, lzNum int) ([]int, bool) {
 	repCards := make([]int, 0)
 	for i := pos; i <= pos+2; i++ {
 		if cards[i] == 0 {
-			repCards = append(repCards, pos)
+			repCards = append(repCards, i)
 		} else {
 			cards[i]--
 		}

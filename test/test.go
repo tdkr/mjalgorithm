@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/tdkr/mjalgorithm/src"
+	hu "github.com/tdkr/mjalgorithm/src"
 )
 
 func PrintMemUsage() {
@@ -32,17 +32,14 @@ func main() {
 		//1, 1, 1, 2, 3, 4, 6, 7, 8, 31, 31, 31, 33, 33,
 		//1, 1, 1, 2, 3, 4, 5, 5,
 		//1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7,
-		//3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6,
-		1, 4, 7,
-		10, 13, 16,
-		33, 33, 33, 33, 33, 33, 33, 33,
+		3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6,
 	}
 	matrix := make([]int, 36)
 	for _, v := range cards {
 		matrix[v]++
 	}
 
-	file := "C:/Users/ronanluo/go/src/gogit.oa.com/266/mahjong/service/table/logic/utils/hu/output.json"
+	file := "/Users/luonan/go/src/github.com/tdkr/mjalgorithm/src/output.json"
 	bytes, err := ioutil.ReadFile(file)
 	if err != nil {
 		log.Println("ReadFile failed", err)
@@ -68,7 +65,8 @@ func main() {
 
 	start = time.Now()
 	lzFlag := make(map[int]bool)
-	lzFlag[33] = true
+	lzFlag[4] = true
+	lzFlag[5] = true
 	var ret [][]int
 	for i := 0; i < 1; i++ {
 		ret = hu.CheckHuWithLZ(huTable, matrix, lzFlag)
