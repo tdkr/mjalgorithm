@@ -5,7 +5,7 @@
 package hu
 
 import (
-	"github.com/eapache/queue"
+	"github.com/phf/go-queue/queue"
 )
 
 func CalcKey(cards []int, pos []int) (key int64) {
@@ -74,6 +74,7 @@ func CheckHu(huTable map[int64][][]int, cards []int) [][]int {
 }
 
 func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) [][]int {
+	//fmt.Println("CheckHuWithLZ, cards", cards, lzFlag)
 	lzNum := 0
 	dupCards := make([]int, len(cards))
 	copy(dupCards, cards)
@@ -94,16 +95,17 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) 
 	}
 	results := make([][]int, 0)
 	for _, eye := range eyeArr {
-		backNum := lzNum
-		repCards, ok := checkEyeWithLz(dupCards, eye, lzNum)
-		if !ok {
+		//fmt.Println("CheckHuWithLZ, eye", dupCards, eye, lzNum)
+		tmpNum := lzNum
+		repCards := queue.New()
+		if !checkEyeWithLz(dupCards, eye, lzNum, repCards) {
 			continue
 		}
-		lzNum -= len(repCards)
+		lzNum -= repCards.Len()
 		ret := queue.New()
-		rep := make([]int, 0, lzNum)
+		rep := queue.New()
 		iterateCards(ret, dupCards, lzNum, 0, rep)
-		for i := 0; i < ret.Length(); i++ {
+		for i := 0; i < ret.Len(); i++ {
 			tmpCards := make([]int, len(dupCards))
 			copy(tmpCards, dupCards)
 			item := ret.Get(i).([]int)
@@ -113,28 +115,31 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) 
 			tmpCards[eye] += 2
 			t := CheckHu(huTable, tmpCards)
 			if t != nil {
-				// fmt.Println("CheckHuWithLZ", eye, tmpCards, t)
+				//fmt.Println("CheckHuWithLZ, result", tmpCards, t)
 				results = append(results, t...)
 			}
 		}
-		lzNum = backNum
+		lzNum = tmpNum
 		dupCards[eye] += 2
-		for _, v := range repCards {
-			dupCards[v]++
+		for i := 0; i < repCards.Len(); i++ {
+			v := repCards.Get(i).(int)
+			dupCards[v]--
 		}
 	}
 	return results
 }
 
-func iterateCards(results *queue.Queue, cards []int, lzNum int, pos int, repCards []int) {
+func iterateCards(results *queue.Queue, cards []int, lzNum int, pos int, repCards *queue.Queue) {
 	if pos >= len(cards) {
 		return
 	}
 	// fmt.Println("iterateCards", pos, cards[pos], cards, repCards, lzNum)
 	if lzNum == 0 {
-		t := make([]int, len(repCards))
-		copy(t, repCards)
-		results.Add(t)
+		t := make([]int, repCards.Len())
+		for i := range t {
+			t[i] = repCards.Get(i).(int)
+		}
+		results.PushBack(t)
 		return
 	}
 	if cards[pos] == 0 {
@@ -142,93 +147,94 @@ func iterateCards(results *queue.Queue, cards []int, lzNum int, pos int, repCard
 		return
 	}
 
-	n0 := len(repCards)
+	n0 := repCards.Len()
 	dupLz := lzNum
 
-	if arr, ok := checkKeWithLz(cards, pos, lzNum); ok {
-		repCards = append(repCards, arr...)
-		lzNum -= len(arr)
-		n1 := len(repCards)
+	if checkKeWithLz(cards, pos, lzNum, repCards) {
+		n1 := repCards.Len()
+		lzNum -= n1 - n0
 		iterateCards(results, cards, lzNum, pos, repCards)
-		n2 := len(repCards)
+		n2 := repCards.Len()
 		lzNum = dupLz
 		for i := 0; i < n2-n1; i++ {
-			repCards = repCards[:len(repCards)-1]
+			repCards.PopBack()
 		}
 		cards[pos] += 3
 		for i := 0; i < n1-n0; i++ {
-			tail := len(repCards) - 1
-			cards[repCards[tail]]--
-			repCards = repCards[:tail]
+			v := repCards.PopBack()
+			cards[v.(int)]--
 		}
 	}
 
 	shunNum := 0
 	for cards[pos] > 0 {
-		if arr, ok := checkShunWithLz(cards, pos, lzNum); ok {
-			repCards = append(repCards, arr...)
-			lzNum -= len(arr)
+		if checkShunWithLz(cards, pos, lzNum, repCards) {
 			shunNum++
 		} else {
 			break
 		}
 	}
 	if shunNum > 0 {
-		n1 := len(repCards)
+		n1 := repCards.Len()
+		lzNum -= n1 - n0
 		iterateCards(results, cards, lzNum, pos+1, repCards)
-		n2 := len(repCards)
+		n2 := repCards.Len()
 		for i := 0; i < n2-n1; i++ {
-			repCards = repCards[:len(repCards)-1]
+			repCards.PopBack()
+		}
+		p := pos
+		if m := pos % 9; m > 6 {
+			p -= m - 6
 		}
 		for i := 0; i < shunNum; i++ {
-			cards[pos]++
-			cards[pos+1]++
-			cards[pos+2]++
+			cards[p]++
+			cards[p+1]++
+			cards[p+2]++
 		}
 		for i := 0; i < n1-n0; i++ {
-			tail := len(repCards) - 1
-			cards[repCards[tail]]--
-			repCards = repCards[:tail]
+			v := repCards.PopBack()
+			cards[v.(int)]--
 		}
 	}
 }
 
-func checkEyeWithLz(cards []int, pos int, lzNum int) ([]int, bool) {
+func checkEyeWithLz(cards []int, pos int, lzNum int, repCards *queue.Queue) bool {
 	if cards[pos]+lzNum < 2 {
-		return nil, false
+		return false
 	}
-	ret := make([]int, 0)
 	if cards[pos] >= 2 {
 		cards[pos] -= 2
 	} else {
 		for i := 0; i < 2-cards[pos]; i++ {
-			ret = append(ret, pos)
+			repCards.PushBack(pos)
 		}
 		cards[pos] = 0
 	}
-	return ret, true
+	return true
 }
 
-func checkKeWithLz(cards []int, pos int, lzNum int) ([]int, bool) {
+func checkKeWithLz(cards []int, pos int, lzNum int, repCards *queue.Queue) bool {
 	if cards[pos]+lzNum < 3 {
-		return nil, false
+		return false
 	}
-	repCards := make([]int, 0)
 	if cards[pos] >= 3 {
 		cards[pos] -= 3
 	} else {
 		for i := 0; i < 3-cards[pos]; i++ {
-			repCards = append(repCards, pos)
+			repCards.PushBack(pos)
 		}
 		lzNum -= 3 - cards[pos]
 		cards[pos] = 0
 	}
-	return repCards, true
+	return true
 }
 
-func checkShunWithLz(cards []int, pos int, lzNum int) ([]int, bool) {
-	if pos/9 == 3 || pos%9 > 6 {
-		return nil, false
+func checkShunWithLz(cards []int, pos int, lzNum int, repCards *queue.Queue) bool {
+	if pos/9 == 3 {
+		return false
+	}
+	if pos > 6 {
+		pos -= pos - 6
 	}
 	need := 0
 	for i := pos; i <= pos+2; i++ {
@@ -237,35 +243,14 @@ func checkShunWithLz(cards []int, pos int, lzNum int) ([]int, bool) {
 		}
 	}
 	if need > lzNum {
-		return nil, false
+		return false
 	}
-	repCards := make([]int, 0)
 	for i := pos; i <= pos+2; i++ {
 		if cards[i] == 0 {
-			repCards = append(repCards, i)
+			repCards.PushBack(i)
 		} else {
 			cards[i]--
 		}
 	}
-	return repCards, true
-}
-
-func scanShunFromPos(cards []int, lzNum int, pos int) (bool, int) {
-	if pos < 0 || pos > 6 {
-		return false, lzNum
-	}
-	if cards[pos] > 0 && cards[pos+1] == 0 && cards[pos+2] == 0 {
-		return false, lzNum
-	}
-	if cards[pos]+cards[pos+1]+cards[pos+2]+lzNum < 3 {
-		return false, lzNum
-	}
-	for i := pos; i <= pos+2; i++ {
-		if cards[i] == 0 {
-			lzNum--
-		} else {
-			cards[i]--
-		}
-	}
-	return true, lzNum
+	return true
 }
