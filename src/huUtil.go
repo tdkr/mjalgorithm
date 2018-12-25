@@ -8,6 +8,60 @@ import (
 	"github.com/phf/go-queue/queue"
 )
 
+type analyseData struct {
+	huTable  map[int64][][]int
+	cards    []int
+	dupCards []int
+	count    map[int]int
+	repCards *queue.Queue
+	result   [][]int
+	lzNum    int
+	eye      int
+}
+
+func (data *analyseData) replace(value int) {
+	data.repCards.PushBack(value)
+	data.lzNum -= 1
+	data.cards[value]++
+}
+
+func (data *analyseData) unreplace(num int, sub bool) {
+	for i := 0; i < num; i++ {
+		v := data.repCards.PopBack()
+		data.lzNum += 1
+		if sub {
+			val := v.(int)
+			data.dupCards[val]--
+			data.cards[val]--
+		}
+	}
+}
+
+func (data *analyseData) duplicate() *analyseData {
+	t := &analyseData{
+		repCards: queue.New(),
+		eye:      data.eye,
+		lzNum:    data.lzNum,
+	}
+	for i := 0; i < data.repCards.Len(); i++ {
+		t.repCards.PushBack(data.repCards.Get(i))
+	}
+	return t
+}
+
+func (data *analyseData) isValid() bool {
+	for _, v := range data.cards {
+		if v > 4 {
+			return false
+		}
+	}
+	return true
+}
+
+func (data *analyseData) isHu() [][]int {
+	return CheckHu(data.huTable, data.cards)
+}
+
 func CalcKey(cards []int, pos []int) (key int64) {
 	isContinue := false /*是否连续*/
 	index := 0
@@ -70,6 +124,7 @@ func CheckHu(huTable map[int64][][]int, cards []int) [][]int {
 	pos := make([]int, 14)
 	key := CalcKey(cards, pos)
 	result := CalcGroups(huTable, key, pos)
+	//fmt.Println("CheckHu, result", cards, result)
 	return result
 }
 
@@ -96,140 +151,114 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) 
 	results := make([][]int, 0)
 	for _, eye := range eyeArr {
 		//fmt.Println("CheckHuWithLZ, eye", dupCards, eye, lzNum)
-		tmpNum := lzNum
-		repCards := queue.New()
-		if !checkEyeWithLz(dupCards, eye, lzNum, repCards) {
-			continue
+		leftNum := lzNum
+		c1 := make([]int, len(dupCards))
+		copy(c1, dupCards)
+		c2 := make([]int, len(dupCards))
+		copy(c2, dupCards)
+		if dupCards[eye] >= 2 {
+			c2[eye] -= 2
+		} else {
+			c1[eye] = 2
+			c2[eye] = 0
+			leftNum -= 2 - dupCards[eye]
 		}
-		lzNum -= repCards.Len()
-		ret := queue.New()
-		rep := queue.New()
-		iterateCards(ret, dupCards, lzNum, 0, rep)
-		for i := 0; i < ret.Len(); i++ {
-			tmpCards := make([]int, len(dupCards))
-			copy(tmpCards, dupCards)
-			item := ret.Get(i).([]int)
-			for _, v := range item {
-				tmpCards[v]++
-			}
-			tmpCards[eye] += 2
-			t := CheckHu(huTable, tmpCards)
-			if t != nil {
-				//fmt.Println("CheckHuWithLZ, result", tmpCards, t)
-				results = append(results, t...)
-			}
+		aData := &analyseData{
+			huTable:  huTable,
+			lzNum:    leftNum,
+			eye:      eye,
+			count:    make(map[int]int),
+			repCards: queue.New(),
+			cards:    c1,
+			dupCards: c2,
 		}
-		lzNum = tmpNum
-		dupCards[eye] += 2
-		for i := 0; i < repCards.Len(); i++ {
-			v := repCards.Get(i).(int)
-			dupCards[v]--
+		rq := queue.New()
+		iterateCards(rq, aData, 0)
+		for i := 0; i < rq.Len(); i++ {
+			t := rq.Get(i).(*analyseData)
+			results = append(results, t.result...)
 		}
 	}
 	return results
 }
 
-func iterateCards(results *queue.Queue, cards []int, lzNum int, pos int, repCards *queue.Queue) {
-	if pos >= len(cards) {
+func iterateCards(results *queue.Queue, data *analyseData, pos int) {
+	if pos >= len(data.cards) {
 		return
 	}
-	// fmt.Println("iterateCards", pos, cards[pos], cards, repCards, lzNum)
-	if lzNum == 0 {
-		t := make([]int, repCards.Len())
-		for i := range t {
-			t[i] = repCards.Get(i).(int)
+	//fmt.Println("iterateCards", pos, data.dupCards[pos], data.dupCards, data.repCards, data.lzNum)
+	if data.lzNum == 0 {
+		if ret := data.isHu(); ret != nil {
+			dup := data.duplicate()
+			dup.result = ret
+			results.PushBack(dup)
 		}
-		results.PushBack(t)
 		return
 	}
-	if cards[pos] == 0 {
-		iterateCards(results, cards, lzNum, pos+1, repCards)
+	if data.dupCards[pos] == 0 {
+		iterateCards(results, data, pos+1)
 		return
 	}
 
-	n0 := repCards.Len()
-	dupLz := lzNum
+	n0 := data.repCards.Len()
 
-	if checkKeWithLz(cards, pos, lzNum, repCards) {
-		n1 := repCards.Len()
-		lzNum -= n1 - n0
-		iterateCards(results, cards, lzNum, pos, repCards)
-		n2 := repCards.Len()
-		lzNum = dupLz
-		for i := 0; i < n2-n1; i++ {
-			repCards.PopBack()
-		}
-		cards[pos] += 3
-		for i := 0; i < n1-n0; i++ {
-			v := repCards.PopBack()
-			cards[v.(int)]--
-		}
+	if checkKeWithLz(data, pos) {
+		n1 := data.repCards.Len()
+		iterateCards(results, data, pos)
+		n2 := data.repCards.Len()
+		data.dupCards[pos] += 3
+		data.unreplace(n2-n1, false)
+		data.unreplace(n1-n0, true)
 	}
 
 	shunNum := 0
-	for cards[pos] > 0 {
-		if checkShunWithLz(cards, pos, lzNum, repCards) {
+	for data.dupCards[pos] > 0 {
+		if checkShunWithLz(data, pos) {
 			shunNum++
 		} else {
 			break
 		}
 	}
 	if shunNum > 0 {
-		n1 := repCards.Len()
-		lzNum -= n1 - n0
-		iterateCards(results, cards, lzNum, pos+1, repCards)
-		n2 := repCards.Len()
-		for i := 0; i < n2-n1; i++ {
-			repCards.PopBack()
-		}
-		p := pos
+		n1 := data.repCards.Len()
+		iterateCards(results, data, pos+1)
+		n2 := data.repCards.Len()
+		var p int
 		if m := pos % 9; m > 6 {
 			p -= m - 6
+		} else {
+			p = pos
 		}
 		for i := 0; i < shunNum; i++ {
-			cards[p]++
-			cards[p+1]++
-			cards[p+2]++
+			data.dupCards[p]++
+			data.dupCards[p+1]++
+			data.dupCards[p+2]++
 		}
-		for i := 0; i < n1-n0; i++ {
-			v := repCards.PopBack()
-			cards[v.(int)]--
-		}
+		data.unreplace(n2-n1, false)
+		data.unreplace(n1-n0, true)
 	}
 }
 
-func checkEyeWithLz(cards []int, pos int, lzNum int, repCards *queue.Queue) bool {
-	if cards[pos]+lzNum < 2 {
+func checkKeWithLz(data *analyseData, pos int) bool {
+	if data.dupCards[pos]+data.lzNum < 3 {
 		return false
 	}
-	if cards[pos] >= 2 {
-		cards[pos] -= 2
+	if data.dupCards[pos] >= 3 {
+		data.dupCards[pos] -= 3
 	} else {
-		for i := 0; i < 2-cards[pos]; i++ {
-			repCards.PushBack(pos)
+		need := 3 - data.dupCards[pos]
+		if data.cards[pos]+need > 4 {
+			return false
 		}
-		cards[pos] = 0
+		for i := 0; i < need; i++ {
+			data.replace(pos)
+		}
+		data.dupCards[pos] = 0
 	}
 	return true
 }
 
-func checkKeWithLz(cards []int, pos int, lzNum int, repCards *queue.Queue) bool {
-	if cards[pos]+lzNum < 3 {
-		return false
-	}
-	if cards[pos] >= 3 {
-		cards[pos] -= 3
-	} else {
-		for i := 0; i < 3-cards[pos]; i++ {
-			repCards.PushBack(pos)
-		}
-		lzNum -= 3 - cards[pos]
-		cards[pos] = 0
-	}
-	return true
-}
-
-func checkShunWithLz(cards []int, pos int, lzNum int, repCards *queue.Queue) bool {
+func checkShunWithLz(data *analyseData, pos int) bool {
 	if pos/9 == 3 {
 		return false
 	}
@@ -238,18 +267,22 @@ func checkShunWithLz(cards []int, pos int, lzNum int, repCards *queue.Queue) boo
 	}
 	need := 0
 	for i := pos; i <= pos+2; i++ {
-		if cards[i] == 0 {
-			need++
+		if data.dupCards[i] == 0 {
+			if data.cards[i] >= 4 {
+				return false
+			} else {
+				need++
+			}
 		}
 	}
-	if need > lzNum {
+	if need > data.lzNum {
 		return false
 	}
 	for i := pos; i <= pos+2; i++ {
-		if cards[i] == 0 {
-			repCards.PushBack(i)
+		if data.dupCards[i] == 0 {
+			data.replace(i)
 		} else {
-			cards[i]--
+			data.dupCards[i]--
 		}
 	}
 	return true
