@@ -223,11 +223,9 @@ func iterateCards(results *queue.Queue, data *analyseData, pos int) {
 		n1 := data.repCards.Len()
 		iterateCards(results, data, pos+1)
 		n2 := data.repCards.Len()
-		var p int
+		p := pos
 		if m := pos % 9; m > 6 {
 			p -= m - 6
-		} else {
-			p = pos
 		}
 		for i := 0; i < shunNum; i++ {
 			data.dupCards[p]++
