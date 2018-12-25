@@ -2,7 +2,7 @@
 @Time : 2018/12/10 9:37
 @Author : RonanLuo
 */
-package hu
+package src
 
 import (
 	"github.com/phf/go-queue/queue"
@@ -12,7 +12,6 @@ type analyseData struct {
 	huTable  map[int64][][]int
 	cards    []int
 	dupCards []int
-	count    map[int]int
 	repCards *queue.Queue
 	result   [][]int
 	lzNum    int
@@ -167,7 +166,6 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) 
 			huTable:  huTable,
 			lzNum:    leftNum,
 			eye:      eye,
-			count:    make(map[int]int),
 			repCards: queue.New(),
 			cards:    c1,
 			dupCards: c2,
