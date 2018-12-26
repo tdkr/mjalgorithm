@@ -5,7 +5,6 @@
 package src
 
 import (
-	"fmt"
 	"github.com/phf/go-queue/queue"
 )
 
@@ -51,16 +50,10 @@ func (data *analyseData) duplicate() *analyseData {
 	return t
 }
 
-func (data *analyseData) isValid() bool {
-	for _, v := range data.cards {
-		if v > 4 {
-			return false
-		}
-	}
-	return true
-}
-
 func (data *analyseData) isHu() [][]int {
+	if data.lzNum%3 != 0 {
+		return nil
+	}
 	return CheckHu(data.huTable, data.cards)
 }
 
@@ -178,23 +171,24 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) 
 		for i := 0; i < rq.Len(); i++ {
 			t := rq.Get(i).(*analyseData)
 			results = append(results, t.result...)
-			fmt.Println("CheckHuWithLZ, result", t.cards, t.repCards, t.result)
+			//fmt.Println("CheckHuWithLZ, result", t.cards, t.repCards, t.result)
 		}
 	}
 	return results
 }
 
 func iterateCards(results *queue.Queue, data *analyseData, pos int) {
-	if pos >= len(data.cards) {
-		return
-	}
-	//fmt.Println("iterateCards", pos, data.dupCards[pos], data.dupCards, data.repCards, data.lzNum)
-	if data.lzNum == 0 {
+	//fmt.Println("iterateCards", pos, data.cards, data.repCards, data.lzNum)
+	if data.lzNum%3 == 10 {
 		if ret := data.isHu(); ret != nil {
 			dup := data.duplicate()
 			dup.result = ret
+			//fmt.Println("iterateCards, result", dup.cards, dup.result)
 			results.PushBack(dup)
 		}
+		return
+	}
+	if pos >= len(data.cards) {
 		return
 	}
 	if data.dupCards[pos] == 0 {
@@ -223,7 +217,9 @@ func iterateCards(results *queue.Queue, data *analyseData, pos int) {
 	}
 	if shunNum > 0 {
 		n1 := data.repCards.Len()
-		iterateCards(results, data, pos+1)
+		if data.dupCards[pos] == 0 {
+			iterateCards(results, data, pos+1)
+		}
 		n2 := data.repCards.Len()
 		p := pos
 		if m := pos % 9; m > 6 {
