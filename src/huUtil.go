@@ -179,7 +179,7 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) 
 
 func iterateCards(results *queue.Queue, data *analyseData, pos int) {
 	//fmt.Println("iterateCards", pos, data.cards, data.repCards, data.lzNum)
-	if data.lzNum%3 == 10 {
+	if data.lzNum%3 == 0 {
 		if ret := data.isHu(); ret != nil {
 			dup := data.duplicate()
 			dup.result = ret
