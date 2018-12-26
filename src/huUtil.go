@@ -5,7 +5,7 @@
 package src
 
 import (
-	"github.com/phf/go-queue/queue"
+	"github.com/tdkr/go-datastructures/queue"
 )
 
 type analyseData struct {
