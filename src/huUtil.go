@@ -20,14 +20,14 @@ type analyseData struct {
 
 func (data *analyseData) replace(value int) {
 	data.repCards.PushBack(value)
-	data.lzNum -= 1
+	data.lzNum--
 	data.cards[value]++
 }
 
 func (data *analyseData) unreplace(num int, sub bool) {
 	for i := 0; i < num; i++ {
 		v := data.repCards.PopBack()
-		data.lzNum += 1
+		data.lzNum++
 		if sub {
 			val := v.(int)
 			data.dupCards[val]--
@@ -128,7 +128,7 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) 
 	lzNum := 0
 	dupCards := make([]int, len(cards))
 	copy(dupCards, cards)
-	for k, _ := range lzFlag {
+	for k := range lzFlag {
 		lzNum += cards[k]
 		dupCards[k] = 0
 	}
