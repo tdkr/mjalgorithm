@@ -5,6 +5,7 @@
 package src
 
 import (
+	"fmt"
 	"github.com/phf/go-queue/queue"
 )
 
@@ -38,10 +39,12 @@ func (data *analyseData) unreplace(num int, sub bool) {
 
 func (data *analyseData) duplicate() *analyseData {
 	t := &analyseData{
+		cards:    make([]int, len(data.cards)),
 		repCards: queue.New(),
 		eye:      data.eye,
 		lzNum:    data.lzNum,
 	}
+	copy(t.cards, data.cards)
 	for i := 0; i < data.repCards.Len(); i++ {
 		t.repCards.PushBack(data.repCards.Get(i))
 	}
@@ -175,6 +178,7 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) 
 		for i := 0; i < rq.Len(); i++ {
 			t := rq.Get(i).(*analyseData)
 			results = append(results, t.result...)
+			fmt.Println("CheckHuWithLZ, result", t.cards, t.repCards, t.result)
 		}
 	}
 	return results
