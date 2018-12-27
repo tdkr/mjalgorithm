@@ -169,8 +169,10 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) 
 		rq := queue.New()
 		iterateCards(rq, aData, 0)
 		for i := 0; i < rq.Len(); i++ {
-			t := rq.Get(i).(*analyseData)
-			results = append(results, t.result...)
+			//t := rq.Get(i).(*analyseData)
+			//results = append(results, t.result...)
+			t := rq.Get(i).([][]int)
+			results = append(results, t...)
 			//fmt.Println("CheckHuWithLZ, result", t.cards, t.repCards, t.result)
 		}
 	}
@@ -181,10 +183,8 @@ func iterateCards(results *queue.Queue, data *analyseData, pos int) {
 	//fmt.Println("iterateCards", pos, data.cards, data.repCards, data.lzNum)
 	if data.lzNum%3 == 0 {
 		if ret := data.isHu(); ret != nil {
-			dup := data.duplicate()
-			dup.result = ret
 			//fmt.Println("iterateCards, result", dup.cards, dup.result)
-			results.PushBack(dup)
+			results.PushBack(ret)
 		}
 		return
 	}
