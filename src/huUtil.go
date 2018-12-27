@@ -8,253 +8,59 @@ import (
 	"github.com/tdkr/go-datastructures/queue"
 )
 
-type analyseData struct {
+type HuGroup struct {
+	EyeList  [][]int
+	KeList   [][]int
+	ShunList [][]int
+}
+
+type iterateData struct {
 	huTable  map[int64][][]int
-	cards    []int
-	dupCards []int
-	repCards *queue.Queue
-	result   [][]int
+	norCards []int
 	lzNum    int
 	eye      int
+	eyeList  [][]int
+	keList   [][]int
+	shunList [][]int
 }
 
-func (data *analyseData) replace(value int) {
-	data.repCards.PushBack(value)
-	data.lzNum--
-	data.cards[value]++
-}
-
-func (data *analyseData) unreplace(num int, sub bool) {
-	for i := 0; i < num; i++ {
-		v := data.repCards.PopBack()
-		data.lzNum++
-		if sub {
-			val := v.(int)
-			data.dupCards[val]--
-			data.cards[val]--
-		}
-	}
-}
-
-func (data *analyseData) duplicate() *analyseData {
-	t := &analyseData{
-		cards:    make([]int, len(data.cards)),
-		repCards: queue.New(),
-		eye:      data.eye,
-		lzNum:    data.lzNum,
-	}
-	copy(t.cards, data.cards)
-	for i := 0; i < data.repCards.Len(); i++ {
-		t.repCards.PushBack(data.repCards.Get(i))
-	}
-	return t
-}
-
-func (data *analyseData) isHu() [][]int {
-	if data.lzNum%3 != 0 {
-		return nil
-	}
-	return CheckHu(data.huTable, data.cards)
-}
-
-func CalcKey(cards []int, pos []int) (key int64) {
-	isContinue := false /*是否连续*/
-	index := 0
-	for row := 0; row < 4; row++ {
-		for col := 0; col < 9; col++ {
-			num := cards[row*9+col]
-			if num == 0 {
-				continue
-			}
-			isContinue = row < 3 && col > 0 && cards[row*9+col-1] > 0
-			switch num {
-			case 1: // 1:0, 10
-				if isContinue {
-					key = key << 1
-				} else {
-					key = (key << 2) + (1 << 2) - 2
-				}
-			case 2, 3, 4: // 2:110,1110, 3:11110, 111110, 4:1111110, 11111110
-				bn := uint(2 * num)
-				if isContinue {
-					bn--
-				}
-				key = (key << bn) + (1 << bn) - 2
-			}
-			pos[index] = row*9 + col
-			index++
-			//fmt.Println("calcKey", row, col, num, strconv.FormatInt(key, 2), isContinue)
-		}
-	}
-	return
-}
-
-func CalcGroups(huTable map[int64][][]int, key int64, pos []int) (result [][]int) {
-	if arr, ok := huTable[key]; ok {
-		result = make([][]int, len(arr))
-		for i, v := range arr {
-			result[i] = make([]int, len(v))
-			result[i][0] = pos[v[0]]
-			result[i][1] = v[1]
-			idx := 2
-			num := v[1]
-			for j := 0; j < num; j++ {
-				result[i][j+idx] = pos[v[idx+j]]
-			}
-			result[i][1+num+1] = v[1+num+1]
-			idx = 1 + num + 1 + 1
-			num = v[1+num+1]
-			for j := 0; j < num; j++ {
-				result[i][j+idx] = pos[v[idx+j]]
-			}
-			//fmt.Printf("AnalyseHuInfo, key : %d, %v\n", result[i])
-		}
-	} else {
-		//fmt.Printf("AnalyseHuInfo, key %b not found\n", key)
-	}
-	return
-}
-
-func CheckHu(huTable map[int64][][]int, cards []int) [][]int {
-	pos := make([]int, 14)
-	key := CalcKey(cards, pos)
-	result := CalcGroups(huTable, key, pos)
-	//fmt.Println("CheckHu, result", cards, result)
-	return result
-}
-
-func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzFlag map[int]bool) [][]int {
-	//fmt.Println("CheckHuWithLZ, cards", cards, lzFlag)
-	lzNum := 0
-	dupCards := make([]int, len(cards))
-	copy(dupCards, cards)
-	for k := range lzFlag {
-		lzNum += cards[k]
-		dupCards[k] = 0
-	}
-	eyeArr := make([]int, 0)
-	for val, num := range dupCards {
-		if num > 0 {
-			eyeArr = append(eyeArr, val)
-		}
-	}
-	if lzNum >= 2 {
-		for k := range lzFlag {
-			eyeArr = append(eyeArr, k)
-		}
-	}
-	results := make([][]int, 0)
-	for _, eye := range eyeArr {
-		//fmt.Println("CheckHuWithLZ, eye", dupCards, eye, lzNum)
-		leftNum := lzNum
-		c1 := make([]int, len(dupCards))
-		copy(c1, dupCards)
-		c2 := make([]int, len(dupCards))
-		copy(c2, dupCards)
-		if dupCards[eye] >= 2 {
-			c2[eye] -= 2
-		} else {
-			c1[eye] = 2
-			c2[eye] = 0
-			leftNum -= 2 - dupCards[eye]
-		}
-		aData := &analyseData{
-			huTable:  huTable,
-			lzNum:    leftNum,
-			eye:      eye,
-			repCards: queue.New(),
-			cards:    c1,
-			dupCards: c2,
-		}
-		rq := queue.New()
-		iterateCards(rq, aData, 0)
-		for i := 0; i < rq.Len(); i++ {
-			//t := rq.Get(i).(*analyseData)
-			//results = append(results, t.result...)
-			t := rq.Get(i).([][]int)
-			results = append(results, t...)
-			//fmt.Println("CheckHuWithLZ, result", t.cards, t.repCards, t.result)
-		}
-	}
-	return results
-}
-
-func iterateCards(results *queue.Queue, data *analyseData, pos int) {
-	//fmt.Println("iterateCards", pos, data.cards, data.repCards, data.lzNum)
-	if data.lzNum%3 == 0 {
-		if ret := data.isHu(); ret != nil {
-			//fmt.Println("iterateCards, result", dup.cards, dup.result)
-			results.PushBack(ret)
-		}
-		return
-	}
-	if pos >= len(data.cards) {
-		return
-	}
-	if data.dupCards[pos] == 0 {
-		iterateCards(results, data, pos+1)
-		return
-	}
-
-	n0 := data.repCards.Len()
-
-	if checkKeWithLz(data, pos) {
-		n1 := data.repCards.Len()
-		iterateCards(results, data, pos)
-		n2 := data.repCards.Len()
-		data.dupCards[pos] += 3
-		data.unreplace(n2-n1, false)
-		data.unreplace(n1-n0, true)
-	}
-
-	shunNum := 0
-	for data.dupCards[pos] > 0 {
-		if checkShunWithLz(data, pos) {
-			shunNum++
-		} else {
-			break
-		}
-	}
-	if shunNum > 0 {
-		n1 := data.repCards.Len()
-		if data.dupCards[pos] == 0 {
-			iterateCards(results, data, pos+1)
-		}
-		n2 := data.repCards.Len()
-		p := pos
-		if m := pos % 9; m > 6 {
-			p -= m - 6
-		}
-		for i := 0; i < shunNum; i++ {
-			data.dupCards[p]++
-			data.dupCards[p+1]++
-			data.dupCards[p+2]++
-		}
-		data.unreplace(n2-n1, false)
-		data.unreplace(n1-n0, true)
-	}
-}
-
-func checkKeWithLz(data *analyseData, pos int) bool {
-	if data.dupCards[pos]+data.lzNum < 3 {
+func (data *iterateData) checkEye(pos int) bool {
+	if data.norCards[pos]+data.lzNum < 2 {
 		return false
 	}
-	if data.dupCards[pos] >= 3 {
-		data.dupCards[pos] -= 3
-	} else {
-		need := 3 - data.dupCards[pos]
-		if data.cards[pos]+need > 4 {
-			return false
+	eyeArr := make([]int, 2)
+	for i := 0; i < 2; i++ {
+		if data.norCards[pos] > 0 {
+			data.norCards[pos]--
+			eyeArr[i] = pos
+		} else {
+			data.lzNum--
+			eyeArr[i] = -1
 		}
-		for i := 0; i < need; i++ {
-			data.replace(pos)
-		}
-		data.dupCards[pos] = 0
 	}
+	data.eyeList = append(data.eyeList, eyeArr)
 	return true
 }
 
-func checkShunWithLz(data *analyseData, pos int) bool {
+func (data *iterateData) checkKe(pos int) bool {
+	if data.norCards[pos]+data.lzNum < 3 {
+		return false
+	}
+	arr := make([]int, 3)
+	for i := 0; i < 3; i++ {
+		if data.norCards[pos] > 0 {
+			data.norCards[pos]--
+			arr[i] = pos
+		} else {
+			data.lzNum--
+			arr[i] = -1
+		}
+	}
+	data.keList = append(data.keList, arr)
+	return true
+}
+
+func (data *iterateData) checkShun(pos int) bool {
 	if pos/9 == 3 {
 		return false
 	}
@@ -263,23 +69,233 @@ func checkShunWithLz(data *analyseData, pos int) bool {
 	}
 	need := 0
 	for i := pos; i <= pos+2; i++ {
-		if data.dupCards[i] == 0 {
-			if data.cards[i] >= 4 {
-				return false
-			} else {
-				need++
-			}
+		if data.norCards[i] == 0 {
+			need++
 		}
 	}
 	if need > data.lzNum {
 		return false
 	}
-	for i := pos; i <= pos+2; i++ {
-		if data.dupCards[i] == 0 {
-			data.replace(i)
+	arr := make([]int, 3)
+	for i := 0; i <= 2; i++ {
+		val := pos + i
+		if data.norCards[val] > 0 {
+			data.norCards[val]--
+			arr[i] = val
 		} else {
-			data.dupCards[i]--
+			data.lzNum--
+			arr[i] = -1
 		}
 	}
+	data.shunList = append(data.shunList, arr)
 	return true
+}
+
+func (data *iterateData) revertEye() {
+	arr := data.eyeList[len(data.eyeList)-1]
+	for _, v := range arr {
+		if v == -1 {
+			data.lzNum++
+		} else {
+			data.norCards[v]++
+		}
+	}
+	data.eyeList = data.eyeList[:len(data.eyeList)-1]
+}
+
+func (data *iterateData) revertKe() {
+	arr := data.keList[len(data.keList)-1]
+	for _, v := range arr {
+		if v == -1 {
+			data.lzNum++
+		} else {
+			data.norCards[v]++
+		}
+	}
+	data.keList = data.keList[:len(data.keList)-1]
+}
+
+func (data *iterateData) revertShun() {
+	arr := data.shunList[len(data.shunList)-1]
+	for _, v := range arr {
+		if v == -1 {
+			data.lzNum++
+		} else {
+			data.norCards[v]++
+		}
+	}
+	data.shunList = data.shunList[:len(data.shunList)-1]
+}
+
+func (data *iterateData) checkHu() []*HuGroup {
+	if data.lzNum%3 != 0 {
+		return nil
+	}
+	data.norCards[data.eye] += 2
+	ret := CheckHuGroup(data.huTable, data.norCards)
+	data.norCards[data.eye] -= 2
+	if ret != nil {
+		for _, v := range ret {
+			v.EyeList = data.eyeList
+			v.KeList = append(v.KeList, data.keList...)
+			v.ShunList = append(v.ShunList, data.shunList...)
+		}
+		return ret
+	}
+	return nil
+}
+
+func CalcKey(cards []int) (key int64, pos []int) {
+	isContinue := false /*是否连续*/
+	index := 0
+	pos = make([]int, 14)
+	for i := 0; i < 34; i++ {
+		row := i / 9
+		col := i % 9
+		num := cards[i]
+		if num == 0 {
+			continue
+		}
+		isContinue = row < 3 && col > 0 && cards[i-1] > 0
+		switch num {
+		case 1: // 1:0, 10
+			if isContinue {
+				key = key << 1
+			} else {
+				key = (key << 2) + (1 << 2) - 2
+			}
+		case 2, 3, 4: // 2:110,1110, 3:11110, 111110, 4:1111110, 11111110
+			bn := uint(2 * num)
+			if isContinue {
+				bn--
+			}
+			key = (key << bn) + (1 << bn) - 2
+		}
+		pos[index] = i
+		index++
+	}
+	return
+}
+
+func CalcGroups(data []int, pos []int) *HuGroup {
+	eyePos := 0
+	eye := pos[data[eyePos]]
+	kePos := 1
+	keNum := data[kePos]
+	shunPos := kePos + keNum + 1
+	shunNum := data[shunPos]
+	ret := &HuGroup{
+		EyeList:  make([][]int, 1),
+		KeList:   make([][]int, keNum),
+		ShunList: make([][]int, shunNum),
+	}
+	ret.EyeList[0] = make([]int, 2)
+	for i := 0; i < 2; i++ {
+		ret.EyeList[0][i] = eye
+	}
+	for i := 0; i < keNum; i++ {
+		ret.KeList[i] = make([]int, 3)
+		val := pos[data[kePos+i+1]]
+		for j := 0; j < 3; j++ {
+			ret.KeList[i][j] = val
+		}
+	}
+	for i := 0; i < shunNum; i++ {
+		ret.ShunList[i] = make([]int, 3)
+		val := pos[data[shunPos+i+1]]
+		for j := 0; j < 3; j++ {
+			ret.ShunList[i][j] = val + j
+		}
+	}
+	// fmt.Println("CalcGroups", eye, keNum, shunNum, ret)
+	return ret
+}
+
+func CheckHuGroup(huTable map[int64][][]int, cards []int) []*HuGroup {
+	key, pos := CalcKey(cards)
+	if data, ok := huTable[key]; ok {
+		ret := make([]*HuGroup, len(data))
+		for i, v := range data {
+			ret[i] = CalcGroups(v, pos)
+		}
+		return ret
+	}
+	return nil
+}
+
+func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzList []int, lzFlag map[int]bool) []*HuGroup {
+	//fmt.Println("CheckHuWithLZ, cards", cards, lzFlag)
+	lzNum := len(lzList)
+	eyeArr := make([]int, 0)
+	for val, num := range cards {
+		if num > 0 || lzFlag[val] {
+			eyeArr = append(eyeArr, val)
+		}
+	}
+	results := make([]*HuGroup, 0)
+	for _, eye := range eyeArr {
+		//fmt.Println("CheckHuWithLZ, eye", cards, eye, lzNum)
+		aData := &iterateData{
+			eye:      eye,
+			huTable:  huTable,
+			lzNum:    lzNum,
+			norCards: cards,
+			shunList: make([][]int, 0),
+			keList:   make([][]int, 0),
+			eyeList:  make([][]int, 0),
+		}
+		if aData.checkEye(eye) {
+			rq := queue.New()
+			iterateCards(rq, aData, 0)
+			for i := 0; i < rq.Len(); i++ {
+				t := rq.Get(i).(*HuGroup)
+				results = append(results, t)
+			}
+			aData.revertEye()
+			//fmt.Println("CheckHuWithLZ, eye2", cards, aData.lzNum)
+		}
+	}
+	return results
+}
+
+func iterateCards(results *queue.Queue, data *iterateData, pos int) {
+	//fmt.Println("iterateCards", pos, data.norCards, data.lzNum)
+	if data.lzNum%3 == 0 {
+		if ret := data.checkHu(); ret != nil {
+			for _, v := range ret {
+				// fmt.Println("iterateCards, result", v)
+				results.PushBack(v)
+			}
+			return
+		}
+	}
+	if pos >= len(data.norCards) {
+		return
+	}
+	if data.norCards[pos] == 0 {
+		iterateCards(results, data, pos+1)
+		return
+	}
+
+	if data.checkKe(pos) {
+		iterateCards(results, data, pos)
+		data.revertKe()
+	}
+
+	shunNum := 0
+	for data.norCards[pos] > 0 {
+		if data.checkShun(pos) {
+			shunNum++
+		} else {
+			break
+		}
+	}
+	if shunNum > 0 {
+		if data.norCards[pos] == 0 {
+			iterateCards(results, data, pos+1)
+		}
+		for i := 0; i < shunNum; i++ {
+			data.revertShun()
+		}
+	}
 }
