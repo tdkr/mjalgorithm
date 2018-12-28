@@ -4,10 +4,6 @@
 */
 package src
 
-import (
-	"github.com/tdkr/go-datastructures/queue"
-)
-
 type HuGroup struct {
 	EyeList  [][]int
 	KeList   [][]int
@@ -22,6 +18,7 @@ type iterateData struct {
 	eyeList  [][]int
 	keList   [][]int
 	shunList [][]int
+	results  []*HuGroup
 }
 
 func (data *iterateData) checkEye(pos int) bool {
@@ -243,14 +240,11 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzList []int, lzFlag 
 			shunList: make([][]int, 0),
 			keList:   make([][]int, 0),
 			eyeList:  make([][]int, 0),
+			results:  make([]*HuGroup, 0),
 		}
 		if aData.checkEye(eye) {
-			rq := queue.New()
-			iterateCards(rq, aData, 0)
-			for i := 0; i < rq.Len(); i++ {
-				t := rq.Get(i).(*HuGroup)
-				results = append(results, t)
-			}
+			iterateCards(aData, 0)
+			results = append(results, aData.results...)
 			aData.revertEye()
 			//fmt.Println("CheckHuWithLZ, eye2", cards, aData.lzNum)
 		}
@@ -258,14 +252,11 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzList []int, lzFlag 
 	return results
 }
 
-func iterateCards(results *queue.Queue, data *iterateData, pos int) {
+func iterateCards(data *iterateData, pos int) {
 	//fmt.Println("iterateCards", pos, data.norCards, data.lzNum)
 	if data.lzNum%3 == 0 {
 		if ret := data.checkHu(); ret != nil {
-			for _, v := range ret {
-				// fmt.Println("iterateCards, result", v)
-				results.PushBack(v)
-			}
+			data.results = append(data.results, ret...)
 			return
 		}
 	}
@@ -273,12 +264,12 @@ func iterateCards(results *queue.Queue, data *iterateData, pos int) {
 		return
 	}
 	if data.norCards[pos] == 0 {
-		iterateCards(results, data, pos+1)
+		iterateCards(data, pos+1)
 		return
 	}
 
 	if data.checkKe(pos) {
-		iterateCards(results, data, pos)
+		iterateCards(data, pos)
 		data.revertKe()
 	}
 
@@ -292,7 +283,7 @@ func iterateCards(results *queue.Queue, data *iterateData, pos int) {
 	}
 	if shunNum > 0 {
 		if data.norCards[pos] == 0 {
-			iterateCards(results, data, pos+1)
+			iterateCards(data, pos+1)
 		}
 		for i := 0; i < shunNum; i++ {
 			data.revertShun()
