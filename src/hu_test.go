@@ -15,13 +15,13 @@ var huTable map[int64][][]int
 
 func BenchmarkCheckHu(b *testing.B) {
 	cards := []int{
-		0, 0, 0, 3, 4, 4, 3, 0, 0,
+		3, 2, 1, 1, 1, 1, 1, 1, 3,
 		0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0,
 	}
 	for i := 0; i < b.N; i++ {
-		CheckHuGroup(huTable, cards)
+		CheckHu(huTable, cards)
 	}
 }
 
@@ -41,7 +41,7 @@ func BenchmarkCheckHuWithLZ(b *testing.B) {
 		0: true,
 		8: true,
 	}
-	lzList := []int{}
+	lzList := make([]int, 0)
 	for i, v := range cards {
 		if lzFlag[i] {
 			for j := 0; j < v; j++ {
@@ -57,13 +57,14 @@ func BenchmarkCheckHuWithLZ(b *testing.B) {
 
 func TestCheckHu(t *testing.T) {
 	cards := []int{
-		2, 3, 4, 3, 2, 0, 0, 0, 0,
+		3, 2, 1, 1, 1, 1, 1, 1, 3,
 		0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0,
 	}
-	ret := CheckHuGroup(huTable, cards)
-	fmt.Println("CheckHu", cards, ret)
+	if ret, ok := CheckHu(huTable, cards); ok {
+		fmt.Println("CheckHu", cards, ret)
+	}
 }
 
 func TestCheckHuWithLZ(t *testing.T) {
@@ -95,15 +96,13 @@ func TestCheckHuWithLZ(t *testing.T) {
 		}
 	}
 	start := time.Now()
-	var ret []*HuGroup
+	var ret [][]int
 	for i := 0; i < 10000; i++ {
 		ret = CheckHuWithLZ(huTable, cards, lzList, lzFlag)
 	}
-	fmt.Println("TestCheckHuWithLZ", time.Since(start))
-	fmt.Println("TestCheckHuWithLZ", len(ret))
-	for i, v := range ret {
-		fmt.Println("TestCheckHuWithLZ, result", i, v.EyeList, v.KeList, v.ShunList)
-	}
+	fmt.Println("TestCheckHuWithLZ, finish", time.Since(start))
+	fmt.Println("TestCheckHuWithLZ, total", len(ret))
+	fmt.Println("TestCheckHuWithLZ, result", ret)
 }
 
 func init() {
