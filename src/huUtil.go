@@ -19,12 +19,12 @@ func (data *iterateData) checkEye(pos int) bool {
 	if data.iterCards[pos]+data.lzNum < 2 {
 		return false
 	}
-	for i := 0; i < 2; i++ {
-		if data.iterCards[pos] > 0 {
-			data.iterCards[pos]--
-		} else {
-			data.lzNum--
-		}
+	needLz := 2 - data.iterCards[pos]
+	if needLz > 0 {
+		data.lzNum -= needLz
+		data.iterCards[pos] = 0
+	} else {
+		data.iterCards[pos] -= 2
 	}
 	data.eye = pos
 	return true
@@ -41,7 +41,8 @@ func (data *iterateData) checkKe(pos int) bool {
 			data.lzNum--
 		}
 	}
-	data.keList = append(data.keList, pos)
+	data.keList[0] += 1
+	data.keList[data.keList[0]] = pos
 	return true
 }
 
@@ -69,7 +70,8 @@ func (data *iterateData) checkShun(pos int) bool {
 			data.lzNum--
 		}
 	}
-	data.shunList = append(data.shunList, pos)
+	data.shunList[0] += 1
+	data.shunList[data.shunList[0]] = pos
 	return true
 }
 
@@ -85,20 +87,18 @@ func (data *iterateData) revertEye() {
 }
 
 func (data *iterateData) revertKe() {
-	index := len(data.keList) - 1
-	val := data.keList[index]
+	val := data.keList[data.keList[0]]
 	if data.iterCards[val]+3 <= data.origCards[val] {
 		data.iterCards[val] += 3
 	} else {
 		data.lzNum += data.iterCards[val] + 3 - data.origCards[val]
 		data.iterCards[val] = data.origCards[val]
 	}
-	data.keList = append(data.keList[:index], data.keList[index+1:]...)
+	data.keList[0] -= 1
 }
 
 func (data *iterateData) revertShun() {
-	index := len(data.shunList) - 1
-	val := data.shunList[index]
+	val := data.shunList[data.shunList[0]]
 	for i := 0; i < 3; i++ {
 		v := val + i
 		if data.iterCards[v] < data.origCards[v] {
@@ -107,7 +107,7 @@ func (data *iterateData) revertShun() {
 			data.lzNum++
 		}
 	}
-	data.shunList = append(data.shunList[:index], data.shunList[index+1:]...)
+	data.shunList[0] -= 1
 }
 
 func (data *iterateData) checkHu() [][]int {
@@ -120,8 +120,8 @@ func (data *iterateData) checkHu() [][]int {
 	if ok {
 		ret := make([][]int, len(arr))
 		for i, v := range arr {
-			ke1, ke2 := v[1], len(data.keList)
-			sh1, sh2 := v[1+ke1+1], len(data.shunList)
+			ke1, ke2 := v[1], data.keList[0]
+			sh1, sh2 := v[1+ke1+1], data.shunList[0]
 			t := make([]int, 3+ke1+ke2+sh1+sh2)
 			t[0] = v[0]
 			//刻子赋值
@@ -131,7 +131,7 @@ func (data *iterateData) checkHu() [][]int {
 				copy(t[p2:], v[p1:p1+ke1])
 			}
 			if ke2 > 0 {
-				copy(t[p2+ke1:], data.keList)
+				copy(t[p2+ke1:], data.keList[1:1+ke2])
 			}
 			//顺子赋值
 			t[p2+ke1+ke2] = sh1 + sh2
@@ -140,7 +140,7 @@ func (data *iterateData) checkHu() [][]int {
 				copy(t[p2:], v[p1:])
 			}
 			if sh2 > 0 {
-				copy(t[p2+sh1:], data.shunList)
+				copy(t[p2+sh1:], data.shunList[1:1+sh2])
 			}
 			ret[i] = t
 		}
@@ -219,28 +219,28 @@ func CheckHuWithLZ(huTable map[int64][][]int, cards []int, lzList []int, lzFlag 
 	lzNum := len(lzList)
 	eyeArr := make([]int, 0)
 	for val, num := range cards {
-		if num > 0 || lzFlag[val] {
+		if num > 0 && lzNum+cards[val] >= 2 {
 			eyeArr = append(eyeArr, val)
 		}
 	}
 	results := make([][]int, 0)
 	for _, eye := range eyeArr {
 		//fmt.Println("CheckHuWithLZ, eye", cards, eye, lzNum)
-		aData := &iterateData{
+		it := &iterateData{
 			huTable:   huTable,
 			lzNum:     lzNum,
 			origCards: cards,
 			iterCards: make([]int, len(cards)),
-			shunList:  make([]int, 0),
-			keList:    make([]int, 0),
+			shunList:  make([]int, 5),
+			keList:    make([]int, 5),
 			results:   make([][]int, 0),
 		}
-		copy(aData.iterCards, aData.origCards)
-		if aData.checkEye(eye) {
-			iterateCards(aData, 0)
-			results = append(results, aData.results...)
-			aData.revertEye()
-			//fmt.Println("CheckHuWithLZ, eye2", cards, aData.lzNum)
+		copy(it.iterCards, it.origCards)
+		if it.checkEye(eye) {
+			iterateCards(it, 0)
+			results = append(results, it.results...)
+			it.revertEye()
+			//fmt.Println("CheckHuWithLZ, eye2", cards, it.lzNum)
 		}
 	}
 	return results
